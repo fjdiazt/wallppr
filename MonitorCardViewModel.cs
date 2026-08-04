@@ -6,16 +6,9 @@ namespace Wallppr;
 
 public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyPropertyChanged
 {
-    private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"
-    };
-
     private string currentWallpaperPath = monitor.WallpaperPath;
-    private string? pendingWallpaperPath;
     private string? slideshowFolderPath;
-    private string[] slideshowImages = [];
-    private int slideshowImageIndex = -1;
+    private string? folderPreviewPath;
     private bool isFolderSource;
     private bool isRandomOrder;
 
@@ -24,34 +17,9 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
     public string Resolution => Monitor.Resolution;
     public string Orientation => Monitor.Orientation;
     public string Id => Monitor.Id;
-    public string CurrentWallpaperPath
-    {
-        get => currentWallpaperPath;
-        set
-        {
-            currentWallpaperPath = value;
-            Notify();
-            Notify(nameof(PreviewPath));
-            Notify(nameof(FileName));
-        }
-    }
-
-    public string? PendingWallpaperPath
-    {
-        get => pendingWallpaperPath;
-        set
-        {
-            pendingWallpaperPath = value;
-            Notify();
-            Notify(nameof(PreviewPath));
-            Notify(nameof(FileName));
-            Notify(nameof(HasPendingWallpaper));
-        }
-    }
-
-    public string PreviewPath => PendingWallpaperPath ?? CurrentWallpaperPath;
+    public string CurrentWallpaperPath => currentWallpaperPath;
+    public string PreviewPath => CurrentWallpaperPath;
     public string FileName => string.IsNullOrWhiteSpace(PreviewPath) ? "No wallpaper set" : Path.GetFileName(PreviewPath);
-    public bool HasPendingWallpaper => !string.IsNullOrWhiteSpace(PendingWallpaperPath);
     public bool IsImageSource => !IsFolderSource;
     public bool IsFolderSource
     {
@@ -69,94 +37,45 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
         }
     }
 
-    public string? SlideshowFolderPath
-    {
-        get => slideshowFolderPath;
-        set
-        {
-            slideshowFolderPath = value;
-            LoadSlideshowImages();
-            Notify();
-            Notify(nameof(FolderName));
-        }
-    }
-
+    public string? SlideshowFolderPath => slideshowFolderPath;
     public string FolderName => string.IsNullOrWhiteSpace(SlideshowFolderPath)
         ? "No folder selected"
         : new DirectoryInfo(SlideshowFolderPath).Name;
-
-    public string? FolderPreviewPath => slideshowImageIndex >= 0 ? slideshowImages[slideshowImageIndex] : null;
+    public string? FolderPreviewPath => folderPreviewPath;
     public string FolderImageName => string.IsNullOrWhiteSpace(FolderPreviewPath) ? "No images found" : Path.GetFileName(FolderPreviewPath);
-    public bool HasFolderImage => slideshowImageIndex >= 0;
+    public bool HasFolderImage => !string.IsNullOrWhiteSpace(FolderPreviewPath);
     public bool HasNoFolderImage => !HasFolderImage;
-
-    public bool IsRandomOrder
-    {
-        get => isRandomOrder;
-        set
-        {
-            if (isRandomOrder == value)
-            {
-                return;
-            }
-
-            isRandomOrder = value;
-            Notify();
-            Notify(nameof(IsSequentialOrder));
-        }
-    }
+    public bool IsRandomOrder => isRandomOrder;
     public bool IsSequentialOrder => !IsRandomOrder;
 
-    public void MoveNextFolderImage()
+    public void ApplyProfile(DisplayProfile profile)
     {
-        if (slideshowImages.Length == 0)
+        isFolderSource = profile.Source == WallpaperSource.Folder;
+        isRandomOrder = profile.Order == WallpaperOrder.Random;
+        slideshowFolderPath = profile.FolderPath;
+        folderPreviewPath = profile.CurrentFolderImagePath;
+
+        if (!string.IsNullOrWhiteSpace(profile.ImagePath))
         {
-            return;
+            currentWallpaperPath = profile.ImagePath;
         }
 
-        slideshowImageIndex = slideshowImages.Length == 1
-            ? 0
-            : IsRandomOrder
-                ? (slideshowImageIndex + Random.Shared.Next(1, slideshowImages.Length)) % slideshowImages.Length
-                : (slideshowImageIndex + 1) % slideshowImages.Length;
-        NotifyFolderPreview();
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    private void LoadSlideshowImages()
-    {
-        try
-        {
-            slideshowImages = Directory.Exists(SlideshowFolderPath)
-                ? Directory.EnumerateFiles(SlideshowFolderPath)
-                    .Where(path => SupportedImageExtensions.Contains(Path.GetExtension(path)))
-                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()
-                : [];
-        }
-        catch (IOException)
-        {
-            slideshowImages = [];
-        }
-        catch (UnauthorizedAccessException)
-        {
-            slideshowImages = [];
-        }
-
-        slideshowImageIndex = slideshowImages.Length == 0
-            ? -1
-            : IsRandomOrder ? Random.Shared.Next(slideshowImages.Length) : 0;
-        NotifyFolderPreview();
-    }
-
-    private void NotifyFolderPreview()
-    {
+        Notify(nameof(IsFolderSource));
+        Notify(nameof(IsImageSource));
+        Notify(nameof(IsRandomOrder));
+        Notify(nameof(IsSequentialOrder));
+        Notify(nameof(SlideshowFolderPath));
+        Notify(nameof(FolderName));
         Notify(nameof(FolderPreviewPath));
         Notify(nameof(FolderImageName));
         Notify(nameof(HasFolderImage));
         Notify(nameof(HasNoFolderImage));
+        Notify(nameof(CurrentWallpaperPath));
+        Notify(nameof(PreviewPath));
+        Notify(nameof(FileName));
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     private void Notify([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

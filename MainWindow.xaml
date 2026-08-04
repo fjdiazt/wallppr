@@ -146,15 +146,7 @@
                                 </Grid>
 
                                 <Grid Grid.Row="4">
-                                    <Grid Visibility="{Binding IsImageSource, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="10" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Style="{StaticResource BaseButtonStyle}" Click="Choose_Click" Content="Choose image" AutomationProperties.Name="Choose wallpaper image" />
-                                        <Button Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Click="Apply_Click" Content="Apply" IsEnabled="{Binding HasPendingWallpaper}" AutomationProperties.Name="Apply wallpaper" />
-                                    </Grid>
+                                    <Button Visibility="{Binding IsImageSource, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource PrimaryButtonStyle}" Click="Choose_Click" Content="Choose image" AutomationProperties.Name="Choose and apply wallpaper image" />
                                     <StackPanel Visibility="{Binding IsFolderSource, Converter={StaticResource BooleanToVisibilityConverter}}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -163,7 +155,7 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <Button Grid.Column="0" Style="{StaticResource BaseButtonStyle}" Click="ChooseFolder_Click" Content="Choose folder" AutomationProperties.Name="Choose slideshow folder" />
-                                            <Button Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Click="NextFolderImage_Click" Content="Next" IsEnabled="{Binding HasFolderImage}" AutomationProperties.Name="Preview next folder image" />
+                                            <Button Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Click="NextFolderImage_Click" Content="Next" IsEnabled="{Binding HasFolderImage}" AutomationProperties.Name="Apply next folder image" />
                                         </Grid>
                                         <TextBlock Margin="2,14,0,7" Text="ORDER" Foreground="{StaticResource MutedTextBrush}" FontSize="10" FontWeight="Bold" />
                                         <Border Padding="3" CornerRadius="11" Background="#0E121B" BorderBrush="#252D40" BorderThickness="1">

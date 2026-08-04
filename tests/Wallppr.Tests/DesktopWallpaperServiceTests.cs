@@ -4,16 +4,11 @@ namespace Wallppr.Tests;
 public sealed class DesktopWallpaperServiceTests
 {
     [TestMethod]
-    public void GetMonitors_returns_active_monitor_geometry()
+    public void Monitor_wallpaper_reports_geometry_without_platform_access()
     {
-        using var service = new DesktopWallpaperService();
+        var monitor = new MonitorWallpaper(0, "display-1", 10, 20, 3440, 1440, "wall.jpg");
 
-        var monitors = service.GetMonitors();
-
-        Assert.IsGreaterThan(0, monitors.Count);
-        Assert.IsTrue(monitors.All(monitor =>
-            !string.IsNullOrWhiteSpace(monitor.Id) &&
-            monitor.Width > 0 &&
-            monitor.Height > 0));
+        Assert.AreEqual("3440 × 1440", monitor.Resolution);
+        Assert.AreEqual("Ultrawide", monitor.Orientation);
     }
 }

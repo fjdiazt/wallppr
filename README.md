@@ -1,6 +1,6 @@
 # wallppr
 
-Focused Windows wallpaper manager. Current POC lists active monitors, previews one selected image per monitor, and applies it through Windows `IDesktopWallpaper`.
+Focused Windows wallpaper manager. The POC applies an image or folder image immediately to one monitor through Windows `IDesktopWallpaper`.
 
 ## Run
 
@@ -12,8 +12,10 @@ dotnet run --project C:\src\wallppr\Wallppr.csproj
 
 - Dark WPF interface
 - Active-monitor resolution and orientation
-- Current wallpaper preview
-- Per-monitor image selection and apply
-- No autorun, scheduler, random selection, or saved profiles yet
+- Immediate per-monitor image and folder selection
+- Sequential or random folder order with an immediate **Next** action
+- Persisted per-display settings in `%LocalAppData%\wallppr\settings.json`
+- UI and future scheduling share the same wallpaper actions
+- No autorun, scheduler, tray behavior, or background mode yet
 
 Monitor COM interop derives from [WallP](https://github.com/LesFerch/WallP), licensed under MIT. See [LICENSE-WallP.txt](LICENSE-WallP.txt).

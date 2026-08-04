@@ -2,24 +2,28 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Media;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace Wallppr;
 
 public partial class MainWindow : Window
 {
-    private readonly DesktopWallpaperService wallpaperService = new();
+    private readonly IWallpaperPlatform wallpaperPlatform;
+    private readonly WallpaperActions actions;
+    private string? startupWarning;
 
     public ObservableCollection<MonitorCardViewModel> Monitors { get; } = [];
 
-    public MainWindow()
+    public MainWindow(IWallpaperPlatform wallpaperPlatform, WallpaperActions actions, string? startupWarning = null)
     {
+        this.wallpaperPlatform = wallpaperPlatform;
+        this.actions = actions;
+        this.startupWarning = startupWarning;
         InitializeComponent();
         DataContext = this;
         Loaded += (_, _) => LoadMonitors();
-        Closed += (_, _) => wallpaperService.Dispose();
         SourceInitialized += (_, _) => EnableDarkTitleBar();
     }
 
@@ -28,13 +32,23 @@ public partial class MainWindow : Window
         try
         {
             Monitors.Clear();
-            foreach (var monitor in wallpaperService.GetMonitors())
+            foreach (var monitor in wallpaperPlatform.GetMonitors())
             {
-                Monitors.Add(new MonitorCardViewModel(monitor));
+                var viewModel = new MonitorCardViewModel(monitor);
+                viewModel.ApplyProfile(actions.GetProfile(monitor.Id));
+                Monitors.Add(viewModel);
             }
 
             DisplayCountText.Text = $"{Monitors.Count} display{(Monitors.Count == 1 ? string.Empty : "s")} online";
-            ShowStatus("Choose an image, preview it, then apply it to one display.");
+            if (startupWarning is not null)
+            {
+                ShowStatus(startupWarning, error: true);
+                startupWarning = null;
+            }
+            else
+            {
+                ShowStatus("Choose an image or folder to apply it immediately.");
+            }
         }
         catch (Exception exception)
         {
@@ -64,8 +78,8 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
-            monitor.PendingWallpaperPath = dialog.FileName;
-            ShowStatus($"{monitor.Name}: ready to apply {Path.GetFileName(dialog.FileName)}.");
+            RunAction(monitor, () => actions.SelectImage(monitor.Id, dialog.FileName),
+                profile => $"{monitor.Name}: applied {Path.GetFileName(profile.ImagePath)}.");
         }
     }
 
@@ -73,8 +87,8 @@ public partial class MainWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            monitor.IsFolderSource = false;
-            ShowStatus($"{monitor.Name}: image source selected.");
+            RunAction(monitor, () => actions.SetSource(monitor.Id, WallpaperSource.Image),
+                _ => $"{monitor.Name}: image source selected.");
         }
     }
 
@@ -82,8 +96,8 @@ public partial class MainWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            monitor.IsFolderSource = true;
-            ShowStatus($"{monitor.Name}: folder source selected. Choose a folder to preview images.");
+            RunAction(monitor, () => actions.SetSource(monitor.Id, WallpaperSource.Folder),
+                _ => $"{monitor.Name}: folder source selected.");
         }
     }
 
@@ -107,8 +121,9 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
-            monitor.SlideshowFolderPath = dialog.FolderName;
-            ShowStatus($"{monitor.Name}: previewing {monitor.FolderImageName}.");
+            var order = monitor.IsRandomOrder ? WallpaperOrder.Random : WallpaperOrder.Sequential;
+            RunAction(monitor, () => actions.SelectFolder(monitor.Id, dialog.FolderName, order),
+                profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.");
         }
     }
 
@@ -116,8 +131,8 @@ public partial class MainWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            monitor.MoveNextFolderImage();
-            ShowStatus($"{monitor.Name}: previewing {monitor.FolderImageName}.");
+            RunAction(monitor, () => actions.Next(monitor.Id),
+                profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.");
         }
     }
 
@@ -125,8 +140,8 @@ public partial class MainWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            monitor.IsRandomOrder = false;
-            ShowStatus($"{monitor.Name}: sequential order selected.");
+            RunAction(monitor, () => actions.SetOrder(monitor.Id, WallpaperOrder.Sequential),
+                _ => $"{monitor.Name}: sequential order selected.");
         }
     }
 
@@ -134,25 +149,18 @@ public partial class MainWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            monitor.IsRandomOrder = true;
-            ShowStatus($"{monitor.Name}: random order selected.");
+            RunAction(monitor, () => actions.SetOrder(monitor.Id, WallpaperOrder.Random),
+                _ => $"{monitor.Name}: random order selected.");
         }
     }
 
-    private void Apply_Click(object sender, RoutedEventArgs e)
+    private void RunAction(MonitorCardViewModel monitor, Func<DisplayProfile> action, Func<DisplayProfile, string> successMessage)
     {
-        if ((sender as FrameworkElement)?.DataContext is not MonitorCardViewModel monitor ||
-            string.IsNullOrWhiteSpace(monitor.PendingWallpaperPath))
-        {
-            return;
-        }
-
         try
         {
-            wallpaperService.SetWallpaper(monitor.Id, monitor.PendingWallpaperPath);
-            monitor.CurrentWallpaperPath = monitor.PendingWallpaperPath;
-            monitor.PendingWallpaperPath = null;
-            ShowStatus($"Applied to {monitor.Name}.", success: true);
+            var profile = action();
+            monitor.ApplyProfile(profile);
+            ShowStatus(successMessage(profile), success: true);
         }
         catch (Exception exception)
         {

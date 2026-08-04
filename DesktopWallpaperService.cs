@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace Wallppr;
 
 // COM shape derived from Les Ferch's MIT-licensed WallP implementation.
-public sealed class DesktopWallpaperService : IDisposable
+public sealed class DesktopWallpaperService : IWallpaperPlatform, IDisposable
 {
     private IDesktopWallpaper? wallpaper = (IDesktopWallpaper)new DesktopWallpaperClass();
 
@@ -12,20 +12,49 @@ public sealed class DesktopWallpaperService : IDisposable
     {
         ObjectDisposedException.ThrowIf(wallpaper is null, this);
 
+        return EnumerateMonitors(
+            wallpaper.GetMonitorDevicePathCount(),
+            wallpaper.GetMonitorDevicePathAt,
+            id =>
+            {
+                var bounds = wallpaper.GetMonitorRECT(id);
+                return (
+                    bounds.Left,
+                    bounds.Top,
+                    bounds.Right - bounds.Left,
+                    bounds.Bottom - bounds.Top);
+            },
+            id => wallpaper.GetWallpaper(id));
+    }
+
+    public static IReadOnlyList<MonitorWallpaper> EnumerateMonitors(
+        uint count,
+        Func<uint, string> getMonitorId,
+        Func<string, (int Left, int Top, int Width, int Height)> getGeometry,
+        Func<string, string?> getWallpaper)
+    {
         var monitors = new List<MonitorWallpaper>();
-        var count = wallpaper.GetMonitorDevicePathCount();
         for (uint index = 0; index < count; index++)
         {
-            var id = wallpaper.GetMonitorDevicePathAt(index);
-            var bounds = wallpaper.GetMonitorRECT(id);
+            var id = getMonitorId(index);
+            (int Left, int Top, int Width, int Height) geometry;
+            try
+            {
+                geometry = getGeometry(id);
+            }
+            catch (COMException exception) when (exception.HResult == unchecked((int)0x80004005))
+            {
+                continue;
+            }
+
             monitors.Add(new MonitorWallpaper(
                 index,
                 id,
-                bounds.Left,
-                bounds.Top,
-                bounds.Right - bounds.Left,
-                bounds.Bottom - bounds.Top,
-                wallpaper.GetWallpaper(id) ?? string.Empty));
+                geometry.Left,
+                geometry.Top,
+                geometry.Width,
+                geometry.Height,
+                getWallpaper(id) ?? string.Empty));
         }
 
         return monitors;
