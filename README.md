@@ -14,8 +14,10 @@ dotnet run --project C:\src\wallppr\Wallppr.csproj
 - Active-monitor resolution and orientation
 - Immediate per-monitor image and folder selection
 - Sequential or random folder order with an immediate **Next** action
-- Persisted per-display settings in `%LocalAppData%\wallppr\settings.json`
+- Persisted display and global settings in `%LocalAppData%\wallppr\settings.json`
+- Global Settings window for Windows startup, minimize-to-tray, and close-to-tray
+- Notification icon with Open, Settings, and Exit actions
 - UI and future scheduling share the same wallpaper actions
-- No autorun, scheduler, tray behavior, or background mode yet
+- No scheduler, installer, or separate background service yet
 
 Monitor COM interop derives from [WallP](https://github.com/LesFerch/WallP), licensed under MIT. See [LICENSE-WallP.txt](LICENSE-WallP.txt).

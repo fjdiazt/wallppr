@@ -21,6 +21,8 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
     public string PreviewPath => CurrentWallpaperPath;
     public string FileName => string.IsNullOrWhiteSpace(PreviewPath) ? "No wallpaper set" : Path.GetFileName(PreviewPath);
     public bool IsImageSource => !IsFolderSource;
+    public WallpaperSource Source => IsFolderSource ? WallpaperSource.Folder : WallpaperSource.Image;
+    public string PreviewActionText => IsFolderSource ? "Choose wallpaper folder" : "Choose wallpaper image";
     public bool IsFolderSource
     {
         get => isFolderSource;
@@ -34,6 +36,8 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
             isFolderSource = value;
             Notify();
             Notify(nameof(IsImageSource));
+            Notify(nameof(Source));
+            Notify(nameof(PreviewActionText));
         }
     }
 
@@ -62,6 +66,8 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
 
         Notify(nameof(IsFolderSource));
         Notify(nameof(IsImageSource));
+        Notify(nameof(Source));
+        Notify(nameof(PreviewActionText));
         Notify(nameof(IsRandomOrder));
         Notify(nameof(IsSequentialOrder));
         Notify(nameof(SlideshowFolderPath));

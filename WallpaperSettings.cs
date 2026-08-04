@@ -12,6 +12,13 @@ public enum WallpaperOrder
     Random
 }
 
+public sealed record AppBehaviorSettings
+{
+    public bool StartWithWindows { get; init; }
+    public bool MinimizeToTray { get; init; }
+    public bool CloseToTray { get; init; }
+}
+
 public sealed record DisplayProfile
 {
     public required string DisplayId { get; init; }
@@ -26,5 +33,6 @@ public sealed record DisplayProfile
 public sealed class WallpprSettings
 {
     public int Version { get; init; } = 1;
+    public AppBehaviorSettings Behavior { get; init; } = new();
     public Dictionary<string, DisplayProfile> Displays { get; init; } = [];
 }

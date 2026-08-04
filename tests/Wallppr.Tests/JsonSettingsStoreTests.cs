@@ -18,7 +18,13 @@ public sealed class JsonSettingsStoreTests
             CurrentFolderImagePath = @"C:\walls\a.jpg",
             LastAppliedUtc = timestamp
         };
-        var settings = new WallpprSettings();
+        var behavior = new AppBehaviorSettings
+        {
+            StartWithWindows = true,
+            MinimizeToTray = true,
+            CloseToTray = true
+        };
+        var settings = new WallpprSettings { Behavior = behavior };
         settings.Displays[profile.DisplayId] = profile;
 
         try
@@ -29,6 +35,7 @@ public sealed class JsonSettingsStoreTests
             var loaded = store.Load();
 
             Assert.AreEqual(profile, loaded.Displays[profile.DisplayId]);
+            Assert.AreEqual(behavior, loaded.Behavior);
         }
         finally
         {

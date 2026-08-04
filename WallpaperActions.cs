@@ -4,8 +4,7 @@ namespace Wallppr;
 
 public sealed class WallpaperActions(
     IWallpaperPlatform platform,
-    ISettingsStore settingsStore,
-    WallpprSettings initialSettings,
+    SettingsRepository settings,
     Random? random = null,
     Func<DateTimeOffset>? utcNow = null)
 {
@@ -14,12 +13,11 @@ public sealed class WallpaperActions(
         ".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"
     };
 
-    private WallpprSettings settings = initialSettings;
     private readonly Random random = random ?? Random.Shared;
     private readonly Func<DateTimeOffset> utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
 
     public DisplayProfile GetProfile(string displayId) =>
-        settings.Displays.TryGetValue(displayId, out var profile)
+        settings.Current.Displays.TryGetValue(displayId, out var profile)
             ? profile
             : new DisplayProfile { DisplayId = displayId };
 
@@ -85,10 +83,12 @@ public sealed class WallpaperActions(
 
     private DisplayProfile Persist(DisplayProfile profile, bool wallpaperChanged)
     {
+        var current = settings.Current;
         var updated = new WallpprSettings
         {
-            Version = settings.Version,
-            Displays = new Dictionary<string, DisplayProfile>(settings.Displays)
+            Version = current.Version,
+            Behavior = current.Behavior,
+            Displays = new Dictionary<string, DisplayProfile>(current.Displays)
             {
                 [profile.DisplayId] = profile
             }
@@ -96,14 +96,13 @@ public sealed class WallpaperActions(
 
         try
         {
-            settingsStore.Save(updated);
+            settings.Save(updated);
         }
         catch (Exception exception) when (wallpaperChanged)
         {
             throw new InvalidOperationException("Wallpaper changed, but settings could not be saved.", exception);
         }
 
-        settings = updated;
         return profile;
     }
 

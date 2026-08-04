@@ -2,9 +2,13 @@ using System.Windows;
 
 namespace Wallppr;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     private DesktopWallpaperService? wallpaperPlatform;
+    private AppBehaviorActions? behaviorActions;
+    private MainWindow? mainWindow;
+    private SettingsWindow? settingsWindow;
+    private TrayIconService? trayIcon;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -25,13 +29,62 @@ public partial class App : Application
             warning = $"Settings could not be loaded: {exception.Message}";
         }
 
-        var actions = new WallpaperActions(wallpaperPlatform, settingsStore, settings);
-        MainWindow = new MainWindow(wallpaperPlatform, actions, warning);
-        MainWindow.Show();
+        var settingsRepository = new SettingsRepository(settingsStore, settings);
+        behaviorActions = new AppBehaviorActions(settingsRepository, new WindowsStartupRegistration());
+        var wallpaperActions = new WallpaperActions(wallpaperPlatform, settingsRepository);
+        mainWindow = new MainWindow(wallpaperPlatform, wallpaperActions, behaviorActions, warning);
+        mainWindow.SettingsRequested += ShowSettings;
+        MainWindow = mainWindow;
+
+        trayIcon = new TrayIconService(mainWindow.Restore, ShowSettings, ExitApplication);
+        behaviorActions.Changed += ApplyTrayBehavior;
+        ApplyTrayBehavior(behaviorActions.Current);
+        mainWindow.Show();
+    }
+
+    private void ShowSettings()
+    {
+        if (settingsWindow is not null)
+        {
+            settingsWindow.Show();
+            settingsWindow.WindowState = WindowState.Normal;
+            settingsWindow.Activate();
+            return;
+        }
+
+        settingsWindow = new SettingsWindow(behaviorActions!)
+        {
+            Owner = mainWindow?.IsVisible == true ? mainWindow : null,
+            WindowStartupLocation = mainWindow?.IsVisible == true
+                ? WindowStartupLocation.CenterOwner
+                : WindowStartupLocation.CenterScreen
+        };
+        settingsWindow.Closed += (_, _) => settingsWindow = null;
+        settingsWindow.Show();
+    }
+
+    private void ApplyTrayBehavior(AppBehaviorSettings behavior)
+    {
+        var useTray = behavior.MinimizeToTray || behavior.CloseToTray;
+        if (!useTray && mainWindow?.IsVisible == false)
+        {
+            mainWindow.Restore();
+        }
+
+        trayIcon?.SetVisible(useTray);
+    }
+
+    private void ExitApplication()
+    {
+        mainWindow?.AllowExit();
+        settingsWindow?.Close();
+        trayIcon?.SetVisible(false);
+        Shutdown();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        trayIcon?.Dispose();
         wallpaperPlatform?.Dispose();
         base.OnExit(e);
     }

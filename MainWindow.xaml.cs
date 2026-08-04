@@ -1,10 +1,14 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Microsoft.Win32;
+using Color = System.Windows.Media.Color;
+using ColorConverter = System.Windows.Media.ColorConverter;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace Wallppr;
 
@@ -12,21 +16,54 @@ public partial class MainWindow : Window
 {
     private readonly IWallpaperPlatform wallpaperPlatform;
     private readonly WallpaperActions actions;
+    private readonly AppBehaviorActions behaviorActions;
     private string? startupWarning;
+    private bool exitAllowed;
 
     public ObservableCollection<MonitorCardViewModel> Monitors { get; } = [];
 
-    public MainWindow(IWallpaperPlatform wallpaperPlatform, WallpaperActions actions, string? startupWarning = null)
+    public event Action? SettingsRequested;
+    public MainWindow(IWallpaperPlatform wallpaperPlatform, WallpaperActions actions, AppBehaviorActions behaviorActions, string? startupWarning = null)
     {
         this.wallpaperPlatform = wallpaperPlatform;
         this.actions = actions;
+        this.behaviorActions = behaviorActions;
         this.startupWarning = startupWarning;
         InitializeComponent();
         DataContext = this;
         Loaded += (_, _) => LoadMonitors();
         SourceInitialized += (_, _) => EnableDarkTitleBar();
+        StateChanged += OnStateChanged;
+        Closing += OnClosing;
     }
 
+
+    public void Restore()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    public void AllowExit() => exitAllowed = true;
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Minimized && behaviorActions.Current.MinimizeToTray)
+        {
+            Hide();
+            WindowState = WindowState.Normal;
+        }
+    }
+
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (!exitAllowed && behaviorActions.Current.CloseToTray)
+        {
+            e.Cancel = true;
+            Hide();
+        }
+    }
     private void LoadMonitors()
     {
         try
@@ -58,11 +95,14 @@ public partial class MainWindow : Window
 
     private void Choose_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not MonitorCardViewModel monitor)
+        if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            return;
+            ChooseImage(monitor);
         }
+    }
 
+    private void ChooseImage(MonitorCardViewModel monitor)
+    {
         var dialog = new OpenFileDialog
         {
             Title = $"Wallpaper for {monitor.Name}",
@@ -103,11 +143,14 @@ public partial class MainWindow : Window
 
     private void ChooseFolder_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not MonitorCardViewModel monitor)
+        if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            return;
+            ChooseFolder(monitor);
         }
+    }
 
+    private void ChooseFolder(MonitorCardViewModel monitor)
+    {
         var dialog = new OpenFolderDialog
         {
             Title = $"Slideshow folder for {monitor.Name}",
@@ -125,6 +168,22 @@ public partial class MainWindow : Window
             RunAction(monitor, () => actions.SelectFolder(monitor.Id, dialog.FolderName, order),
                 profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.");
         }
+    }
+
+    private void Preview_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not MonitorCardViewModel monitor)
+        {
+            return;
+        }
+
+        if (monitor.Source == WallpaperSource.Folder)
+        {
+            ChooseFolder(monitor);
+            return;
+        }
+
+        ChooseImage(monitor);
     }
 
     private void NextFolderImage_Click(object sender, RoutedEventArgs e)
@@ -169,6 +228,8 @@ public partial class MainWindow : Window
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => LoadMonitors();
+
+    private void Settings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
 
     private void ShowStatus(string message, bool error = false, bool success = false)
     {

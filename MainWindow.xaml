@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:Wallppr"
         mc:Ignorable="d"
         Title="wallppr"
-        Width="1180"
+        Icon="/Assets/wallppr.ico"
+        Width="1540"
         Height="780"
         MinWidth="760"
         MinHeight="560"
@@ -38,12 +39,20 @@
                     <TextBlock Margin="0,7,0,0" Text="Wallpaper, monitor by monitor." Foreground="{StaticResource MutedTextBrush}" FontSize="15" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                    <Button Style="{StaticResource BaseButtonStyle}" Click="Refresh_Click" AutomationProperties.Name="Refresh displays">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="↻" FontSize="18" Margin="0,-3,8,-1" />
-                            <TextBlock Text="Refresh" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Margin="0,0,10,0" Style="{StaticResource BaseButtonStyle}" Click="Settings_Click" AutomationProperties.Name="Open settings">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="14" Margin="0,0,8,0" />
+                                <TextBlock Text="Settings" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource BaseButtonStyle}" Click="Refresh_Click" AutomationProperties.Name="Refresh displays">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="↻" FontSize="18" Margin="0,-3,8,-1" />
+                                <TextBlock Text="Refresh" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                     <TextBlock x:Name="DisplayCountText" Margin="0,9,0,0" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" FontSize="12" />
                 </StackPanel>
             </Grid>
@@ -100,7 +109,7 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Grid.Row="2" CornerRadius="12" Background="#090B10" BorderBrush="#30394D" BorderThickness="1" ClipToBounds="True">
+                                <Button Grid.Row="2" Style="{StaticResource PreviewButtonStyle}" Click="Preview_Click" ToolTip="{Binding PreviewActionText}" AutomationProperties.Name="{Binding PreviewActionText}">
                                     <Grid>
                                         <Grid Visibility="{Binding IsImageSource, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <TextBlock Text="PREVIEW" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#465066" FontSize="11" FontWeight="Bold" />
@@ -131,7 +140,7 @@
                                             </StackPanel>
                                         </Grid>
                                     </Grid>
-                                </Border>
+                                </Button>
 
                                 <Grid Grid.Row="3" Margin="2,13,2,14">
                                     <StackPanel Visibility="{Binding IsImageSource, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -180,7 +189,7 @@
         <Border Grid.Row="3" Padding="34,12" Background="#0D1018" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <TextBlock Text="Native Windows wallpaper API" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
-                <TextBlock HorizontalAlignment="Right" Text="No scheduler · No autorun · POC" Foreground="#69758B" FontSize="11" />
+                <TextBlock HorizontalAlignment="Right" Text="Settings &amp; tray · No scheduler · POC" Foreground="#69758B" FontSize="11" />
             </Grid>
         </Border>
     </Grid>

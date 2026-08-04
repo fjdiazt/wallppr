@@ -20,6 +20,8 @@ public sealed class MonitorCardPresentationTests
 
         Assert.IsTrue(viewModel.IsFolderSource);
         Assert.IsTrue(viewModel.IsRandomOrder);
+        Assert.AreEqual(WallpaperSource.Folder, viewModel.Source);
+        Assert.AreEqual("Choose wallpaper folder", viewModel.PreviewActionText);
         Assert.AreEqual(profile.CurrentFolderImagePath, viewModel.FolderPreviewPath);
         Assert.AreEqual(profile.FolderPath, viewModel.SlideshowFolderPath);
     }

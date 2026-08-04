@@ -12,7 +12,7 @@ public sealed class WallpaperActionsTests
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
         var timestamp = new DateTimeOffset(2026, 8, 4, 15, 0, 0, TimeSpan.Zero);
-        var actions = new WallpaperActions(platform, store, store.Settings, new Random(1), () => timestamp);
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1), () => timestamp);
 
         try
         {
@@ -41,7 +41,7 @@ public sealed class WallpaperActionsTests
         File.WriteAllBytes(Path.Combine(folder, "ignored.txt"), []);
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, store, store.Settings, new Random(1));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
 
         try
         {
@@ -64,7 +64,7 @@ public sealed class WallpaperActionsTests
         File.WriteAllBytes(Path.Combine(folder, "b.png"), []);
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, store, store.Settings, new Random(1));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
 
         try
         {
@@ -84,7 +84,7 @@ public sealed class WallpaperActionsTests
     {
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, store, store.Settings, new Random(1));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
 
         var profile = actions.SetOrder("display-1", WallpaperOrder.Random);
 
@@ -98,7 +98,7 @@ public sealed class WallpaperActionsTests
     {
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, store, store.Settings);
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings));
 
         var profile = actions.SetSource("display-1", WallpaperSource.Folder);
 
@@ -116,7 +116,7 @@ public sealed class WallpaperActionsTests
         File.WriteAllBytes(image, []);
         var platform = new FakeWallpaperPlatform { ThrowOnSet = true };
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, store, store.Settings, new Random(1));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
 
         try
         {
