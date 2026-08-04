@@ -4,6 +4,7 @@ namespace Wallppr;
 
 public partial class App : System.Windows.Application
 {
+    private SingleInstanceCoordinator? singleInstance;
     private DesktopWallpaperService? wallpaperPlatform;
     private AppBehaviorActions? behaviorActions;
     private MainWindow? mainWindow;
@@ -13,6 +14,14 @@ public partial class App : System.Windows.Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        singleInstance = new SingleInstanceCoordinator("wallppr");
+        if (!singleInstance.IsPrimary)
+        {
+            singleInstance.SignalPrimary();
+            Shutdown();
+            return;
+        }
 
         wallpaperPlatform = new DesktopWallpaperService();
         var settingsStore = new JsonSettingsStore();
@@ -42,6 +51,11 @@ public partial class App : System.Windows.Application
         behaviorActions.Changed += ApplyTrayBehavior;
         ApplyTrayBehavior(behaviorActions.Current);
         mainWindow.Show();
+        singleInstance.ActivationRequested += () =>
+        {
+            Dispatcher.BeginInvoke(mainWindow.Restore);
+        };
+        singleInstance.StartListening();
     }
 
     private void ShowSettings()
@@ -86,6 +100,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        singleInstance?.Dispose();
         trayIcon?.Dispose();
         wallpaperPlatform?.Dispose();
         base.OnExit(e);
