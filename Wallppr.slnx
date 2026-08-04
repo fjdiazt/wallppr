@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/Wallppr.Tests/Wallppr.Tests.csproj" />
+  </Folder>
+  <Project Path="Wallppr.csproj" />
+</Solution>
