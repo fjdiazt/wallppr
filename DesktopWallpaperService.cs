@@ -6,25 +6,34 @@ namespace Wallppr;
 // COM shape derived from Les Ferch's MIT-licensed WallP implementation.
 public sealed class DesktopWallpaperService : IWallpaperPlatform, IDisposable
 {
-    private IDesktopWallpaper? wallpaper = (IDesktopWallpaper)new DesktopWallpaperClass();
+    private IDesktopWallpaper? wallpaper;
+    private bool disposed;
 
     public IReadOnlyList<MonitorWallpaper> GetMonitors()
     {
-        ObjectDisposedException.ThrowIf(wallpaper is null, this);
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var workerWallpaper = (IDesktopWallpaper)new DesktopWallpaperClass();
 
-        return EnumerateMonitors(
-            wallpaper.GetMonitorDevicePathCount(),
-            wallpaper.GetMonitorDevicePathAt,
-            id =>
-            {
-                var bounds = wallpaper.GetMonitorRECT(id);
-                return (
-                    bounds.Left,
-                    bounds.Top,
-                    bounds.Right - bounds.Left,
-                    bounds.Bottom - bounds.Top);
-            },
-            id => wallpaper.GetWallpaper(id));
+        try
+        {
+            return EnumerateMonitors(
+                workerWallpaper.GetMonitorDevicePathCount(),
+                workerWallpaper.GetMonitorDevicePathAt,
+                id =>
+                {
+                    var bounds = workerWallpaper.GetMonitorRECT(id);
+                    return (
+                        bounds.Left,
+                        bounds.Top,
+                        bounds.Right - bounds.Left,
+                        bounds.Bottom - bounds.Top);
+                },
+                id => workerWallpaper.GetWallpaper(id));
+        }
+        finally
+        {
+            Marshal.FinalReleaseComObject(workerWallpaper);
+        }
     }
 
     public static IReadOnlyList<MonitorWallpaper> EnumerateMonitors(
@@ -62,7 +71,7 @@ public sealed class DesktopWallpaperService : IWallpaperPlatform, IDisposable
 
     public void SetWallpaper(string monitorId, string imagePath)
     {
-        ObjectDisposedException.ThrowIf(wallpaper is null, this);
+        ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(monitorId);
         ArgumentException.ThrowIfNullOrWhiteSpace(imagePath);
 
@@ -72,7 +81,7 @@ public sealed class DesktopWallpaperService : IWallpaperPlatform, IDisposable
             throw new FileNotFoundException("Wallpaper image not found.", fullPath);
         }
 
-        wallpaper.SetWallpaper(monitorId, fullPath);
+        (wallpaper ??= (IDesktopWallpaper)new DesktopWallpaperClass()).SetWallpaper(monitorId, fullPath);
     }
 
     public void Dispose()
@@ -82,6 +91,8 @@ public sealed class DesktopWallpaperService : IWallpaperPlatform, IDisposable
             Marshal.FinalReleaseComObject(wallpaper);
             wallpaper = null;
         }
+
+        disposed = true;
     }
 
     [StructLayout(LayoutKind.Sequential)]

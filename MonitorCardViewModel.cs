@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Windows.Media;
 
 namespace Wallppr;
 
@@ -11,6 +12,8 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
     private string? folderPreviewPath;
     private bool isFolderSource;
     private bool isRandomOrder;
+    private bool isThumbnailLoading;
+    private ImageSource? thumbnail;
 
     public MonitorWallpaper Monitor { get; } = monitor;
     public string Name => Monitor.Name;
@@ -23,6 +26,28 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
     public bool IsImageSource => !IsFolderSource;
     public WallpaperSource Source => IsFolderSource ? WallpaperSource.Folder : WallpaperSource.Image;
     public string PreviewActionText => IsFolderSource ? "Choose wallpaper folder" : "Choose wallpaper image";
+    public ImageSource? Thumbnail
+    {
+        get => thumbnail;
+        set
+        {
+            if (ReferenceEquals(thumbnail, value)) return;
+            thumbnail = value;
+            Notify();
+        }
+    }
+
+    public bool IsThumbnailLoading
+    {
+        get => isThumbnailLoading;
+        set
+        {
+            if (isThumbnailLoading == value) return;
+            isThumbnailLoading = value;
+            Notify();
+        }
+    }
+
     public bool IsFolderSource
     {
         get => isFolderSource;

@@ -30,12 +30,7 @@ public sealed class AppBehaviorActions(SettingsRepository settings, IStartupRegi
     private AppBehaviorSettings Save(AppBehaviorSettings behavior)
     {
         var current = settings.Current;
-        settings.Save(new WallpprSettings
-        {
-            Version = current.Version,
-            Behavior = behavior,
-            Displays = new Dictionary<string, DisplayProfile>(current.Displays)
-        });
+        settings.Save(current with { Behavior = behavior });
         Changed?.Invoke(behavior);
         return behavior;
     }

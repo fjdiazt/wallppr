@@ -24,7 +24,8 @@ public sealed class JsonSettingsStoreTests
             MinimizeToTray = true,
             CloseToTray = true
         };
-        var settings = new WallpprSettings { Behavior = behavior };
+        var cached = new MonitorWallpaper(0, "display-1", 0, 0, 1920, 1080, "wall.jpg");
+        var settings = new WallpprSettings { Behavior = behavior, CachedDisplays = [cached] };
         settings.Displays[profile.DisplayId] = profile;
 
         try
@@ -36,6 +37,7 @@ public sealed class JsonSettingsStoreTests
 
             Assert.AreEqual(profile, loaded.Displays[profile.DisplayId]);
             Assert.AreEqual(behavior, loaded.Behavior);
+            Assert.AreEqual(cached, loaded.CachedDisplays.Single());
         }
         finally
         {

@@ -31,13 +31,14 @@ public sealed class AppBehaviorActionsTests
     }
 
     [TestMethod]
-    public void Action_services_preserve_each_others_settings()
+    public async Task Action_services_preserve_each_others_settings()
     {
-        var store = new MemorySettingsStore();
+        var cached = new MonitorWallpaper(0, "display-1", 0, 0, 1920, 1080, "cached.jpg");
+        var store = new MemorySettingsStore(new WallpprSettings { CachedDisplays = [cached] });
         var repository = new SettingsRepository(store, store.Settings);
         var behaviorActions = new AppBehaviorActions(repository, new FakeStartupRegistration());
-        var wallpaperActions = new WallpaperActions(new FakeWallpaperPlatform(), repository);
         var folder = Path.Combine(Path.GetTempPath(), $"wallppr-shared-{Guid.NewGuid():N}");
+        var wallpaperActions = new WallpaperActions(new FakeWallpaperPlatform(), repository, new WallpaperThumbnailCache(Path.Combine(folder, "cache")));
         Directory.CreateDirectory(folder);
         var image = Path.Combine(folder, "wall.jpg");
         File.WriteAllBytes(image, []);
@@ -45,10 +46,12 @@ public sealed class AppBehaviorActionsTests
         try
         {
             behaviorActions.SetMinimizeToTray(true);
-            wallpaperActions.SelectImage("display-1", image);
+            Assert.AreEqual(cached, store.Settings.CachedDisplays.Single());
+            await wallpaperActions.SelectImageAsync("display-1", image);
 
             Assert.IsTrue(store.Settings.Behavior.MinimizeToTray);
             Assert.AreEqual(image, store.Settings.Displays["display-1"].ImagePath);
+            Assert.AreEqual(cached, store.Settings.CachedDisplays.Single());
         }
         finally
         {
@@ -71,9 +74,9 @@ public sealed class AppBehaviorActionsTests
         }
     }
 
-    private sealed class MemorySettingsStore : ISettingsStore
+    private sealed class MemorySettingsStore(WallpprSettings? settings = null) : ISettingsStore
     {
-        public WallpprSettings Settings { get; private set; } = new();
+        public WallpprSettings Settings { get; private set; } = settings ?? new();
         public WallpprSettings Load() => Settings;
         public void Save(WallpprSettings settings) => Settings = settings;
     }

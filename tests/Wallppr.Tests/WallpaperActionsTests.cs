@@ -4,7 +4,7 @@ namespace Wallppr.Tests;
 public sealed class WallpaperActionsTests
 {
     [TestMethod]
-    public void Selecting_image_applies_and_persists_profile()
+    public async Task Selecting_image_applies_and_persists_profile()
     {
         var folder = CreateFolder();
         var image = Path.Combine(folder, "wall.jpg");
@@ -12,11 +12,12 @@ public sealed class WallpaperActionsTests
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
         var timestamp = new DateTimeOffset(2026, 8, 4, 15, 0, 0, TimeSpan.Zero);
-        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1), () => timestamp);
+        var cache = new WallpaperThumbnailCache(Path.Combine(folder, "cache"));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), cache, new Random(1), () => timestamp);
 
         try
         {
-            var profile = actions.SelectImage("display-1", image);
+            var profile = await actions.SelectImageAsync("display-1", image);
 
             Assert.AreEqual(("display-1", image), platform.LastSet);
             Assert.AreEqual(WallpaperSource.Image, profile.Source);
@@ -31,7 +32,7 @@ public sealed class WallpaperActionsTests
     }
 
     [TestMethod]
-    public void Sequential_folder_selection_and_next_apply_and_wrap()
+    public async Task Sequential_folder_selection_and_next_apply_and_wrap()
     {
         var folder = CreateFolder();
         var first = Path.Combine(folder, "a.jpg");
@@ -41,13 +42,14 @@ public sealed class WallpaperActionsTests
         File.WriteAllBytes(Path.Combine(folder, "ignored.txt"), []);
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
+        var cache = new WallpaperThumbnailCache(Path.Combine(folder, "cache"));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), cache, new Random(1));
 
         try
         {
-            Assert.AreEqual(first, actions.SelectFolder("display-1", folder, WallpaperOrder.Sequential).CurrentFolderImagePath);
-            Assert.AreEqual(second, actions.Next("display-1").CurrentFolderImagePath);
-            Assert.AreEqual(first, actions.Next("display-1").CurrentFolderImagePath);
+            Assert.AreEqual(first, (await actions.SelectFolderAsync("display-1", folder, WallpaperOrder.Sequential)).CurrentFolderImagePath);
+            Assert.AreEqual(second, (await actions.NextAsync("display-1")).CurrentFolderImagePath);
+            Assert.AreEqual(first, (await actions.NextAsync("display-1")).CurrentFolderImagePath);
             CollectionAssert.AreEqual(new[] { first, second, first }, platform.SetPaths);
         }
         finally
@@ -57,19 +59,20 @@ public sealed class WallpaperActionsTests
     }
 
     [TestMethod]
-    public void Random_next_avoids_immediate_repeat()
+    public async Task Random_next_avoids_immediate_repeat()
     {
         var folder = CreateFolder();
         File.WriteAllBytes(Path.Combine(folder, "a.jpg"), []);
         File.WriteAllBytes(Path.Combine(folder, "b.png"), []);
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
+        var cache = new WallpaperThumbnailCache(Path.Combine(folder, "cache"));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), cache, new Random(1));
 
         try
         {
-            var first = actions.SelectFolder("display-1", folder, WallpaperOrder.Random).CurrentFolderImagePath;
-            var second = actions.Next("display-1").CurrentFolderImagePath;
+            var first = (await actions.SelectFolderAsync("display-1", folder, WallpaperOrder.Random)).CurrentFolderImagePath;
+            var second = (await actions.NextAsync("display-1")).CurrentFolderImagePath;
 
             Assert.AreNotEqual(first, second);
         }
@@ -84,7 +87,7 @@ public sealed class WallpaperActionsTests
     {
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), CreateCache(), new Random(1));
 
         var profile = actions.SetOrder("display-1", WallpaperOrder.Random);
 
@@ -98,7 +101,7 @@ public sealed class WallpaperActionsTests
     {
         var platform = new FakeWallpaperPlatform();
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), CreateCache());
 
         var profile = actions.SetSource("display-1", WallpaperSource.Folder);
 
@@ -109,18 +112,19 @@ public sealed class WallpaperActionsTests
 
 
     [TestMethod]
-    public void Platform_failure_does_not_persist_profile()
+    public async Task Platform_failure_does_not_persist_profile()
     {
         var folder = CreateFolder();
         var image = Path.Combine(folder, "wall.jpg");
         File.WriteAllBytes(image, []);
         var platform = new FakeWallpaperPlatform { ThrowOnSet = true };
         var store = new MemorySettingsStore();
-        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), new Random(1));
+        var cache = new WallpaperThumbnailCache(Path.Combine(folder, "cache"));
+        var actions = new WallpaperActions(platform, new SettingsRepository(store, store.Settings), cache, new Random(1));
 
         try
         {
-            Assert.ThrowsExactly<InvalidOperationException>(() => actions.SelectImage("display-1", image));
+            await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => actions.SelectImageAsync("display-1", image));
             Assert.IsFalse(store.Settings.Displays.ContainsKey("display-1"));
         }
         finally
@@ -135,6 +139,9 @@ public sealed class WallpaperActionsTests
         Directory.CreateDirectory(folder);
         return folder;
     }
+
+    private static WallpaperThumbnailCache CreateCache() =>
+        new(Path.Combine(Path.GetTempPath(), $"wallppr-cache-{Guid.NewGuid():N}"));
 
     private sealed class FakeWallpaperPlatform : IWallpaperPlatform
     {

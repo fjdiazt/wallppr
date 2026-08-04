@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
@@ -14,29 +15,39 @@ namespace Wallppr;
 
 public partial class MainWindow : Window
 {
-    private readonly IWallpaperPlatform wallpaperPlatform;
+    private readonly DisplayDiscovery displayDiscovery;
     private readonly WallpaperActions actions;
     private readonly AppBehaviorActions behaviorActions;
+    private readonly WallpaperThumbnailCache thumbnails;
+    private CancellationTokenSource thumbnailLoads = new();
     private string? startupWarning;
     private bool exitAllowed;
+    private bool isLoading;
 
     public ObservableCollection<MonitorCardViewModel> Monitors { get; } = [];
 
     public event Action? SettingsRequested;
-    public MainWindow(IWallpaperPlatform wallpaperPlatform, WallpaperActions actions, AppBehaviorActions behaviorActions, string? startupWarning = null)
+
+    public MainWindow(
+        DisplayDiscovery displayDiscovery,
+        WallpaperActions actions,
+        AppBehaviorActions behaviorActions,
+        WallpaperThumbnailCache thumbnails,
+        string? startupWarning = null)
     {
-        this.wallpaperPlatform = wallpaperPlatform;
+        this.displayDiscovery = displayDiscovery;
         this.actions = actions;
         this.behaviorActions = behaviorActions;
+        this.thumbnails = thumbnails;
         this.startupWarning = startupWarning;
         InitializeComponent();
         DataContext = this;
-        Loaded += (_, _) => LoadMonitors();
+        ContentRendered += OnContentRendered;
         SourceInitialized += (_, _) => EnableDarkTitleBar();
         StateChanged += OnStateChanged;
         Closing += OnClosing;
+        Closed += (_, _) => thumbnailLoads.Cancel();
     }
-
 
     public void Restore()
     {
@@ -46,6 +57,12 @@ public partial class MainWindow : Window
     }
 
     public void AllowExit() => exitAllowed = true;
+
+    private async void OnContentRendered(object? sender, EventArgs e)
+    {
+        ContentRendered -= OnContentRendered;
+        await LoadMonitorsAsync(refresh: false);
+    }
 
     private void OnStateChanged(object? sender, EventArgs e)
     {
@@ -64,16 +81,36 @@ public partial class MainWindow : Window
             Hide();
         }
     }
-    private void LoadMonitors()
+
+    private async Task LoadMonitorsAsync(bool refresh)
     {
+        if (isLoading)
+        {
+            return;
+        }
+
+        isLoading = true;
+        SetLoading(true);
+        await Dispatcher.Yield(DispatcherPriority.Render);
         try
         {
-            Monitors.Clear();
-            foreach (var monitor in wallpaperPlatform.GetMonitors())
+            var monitors = await displayDiscovery.LoadAsync(refresh);
+            var cards = monitors.Select(monitor =>
             {
                 var viewModel = new MonitorCardViewModel(monitor);
                 viewModel.ApplyProfile(actions.GetProfile(monitor.Id));
-                Monitors.Add(viewModel);
+                return viewModel;
+            }).ToList();
+
+            thumbnailLoads.Cancel();
+            thumbnailLoads.Dispose();
+            thumbnailLoads = new CancellationTokenSource();
+
+            Monitors.Clear();
+            foreach (var card in cards)
+            {
+                Monitors.Add(card);
+                await Dispatcher.Yield(DispatcherPriority.Background);
             }
 
             DisplayCountText.Text = $"{Monitors.Count} display{(Monitors.Count == 1 ? string.Empty : "s")} online";
@@ -86,22 +123,74 @@ public partial class MainWindow : Window
             {
                 ShowStatus("Choose an image or folder to apply it immediately.");
             }
+
+            _ = LoadThumbnailsAsync(cards, thumbnailLoads.Token);
         }
         catch (Exception exception)
         {
+            if (Monitors.Count == 0) DisplayCountText.Text = "Displays unavailable";
             ShowStatus(exception.Message, error: true);
+        }
+        finally
+        {
+            SetLoading(false);
+            isLoading = false;
         }
     }
 
-    private void Choose_Click(object sender, RoutedEventArgs e)
+    private async Task LoadThumbnailsAsync(IEnumerable<MonitorCardViewModel> cards, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.WhenAll(cards.Select(card => LoadThumbnailAsync(card, ensure: true, cancellationToken)));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task LoadThumbnailAsync(MonitorCardViewModel monitor, bool ensure, CancellationToken cancellationToken)
+    {
+        monitor.IsThumbnailLoading = true;
+        try
+        {
+            var profile = actions.GetProfile(monitor.Id);
+            var image = await thumbnails.LoadAsync(actions.GetThumbnailPath(profile), cancellationToken);
+            if (image is null && ensure)
+            {
+                profile = await actions.EnsureThumbnailAsync(monitor.Id, cancellationToken);
+                image = await thumbnails.LoadAsync(actions.GetThumbnailPath(profile), cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            monitor.ApplyProfile(profile);
+            monitor.Thumbnail = image;
+        }
+        finally
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                monitor.IsThumbnailLoading = false;
+            }
+        }
+    }
+
+    private void SetLoading(bool loading)
+    {
+        RefreshButton.IsEnabled = !loading;
+        LoadingOverlay.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        if (loading && Monitors.Count == 0) DisplayCountText.Text = "Loading displays…";
+    }
+
+    private async void Choose_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            ChooseImage(monitor);
+            await ChooseImageAsync(monitor);
         }
     }
 
-    private void ChooseImage(MonitorCardViewModel monitor)
+    private async Task ChooseImageAsync(MonitorCardViewModel monitor)
     {
         var dialog = new OpenFileDialog
         {
@@ -118,38 +207,44 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
-            RunAction(monitor, () => actions.SelectImage(monitor.Id, dialog.FileName),
+            await RunActionAsync(monitor, token => actions.SelectImageAsync(monitor.Id, dialog.FileName, token),
                 profile => $"{monitor.Name}: applied {Path.GetFileName(profile.ImagePath)}.");
         }
     }
 
-    private void ImageSource_Click(object sender, RoutedEventArgs e)
+    private async void ImageSource_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            RunAction(monitor, () => actions.SetSource(monitor.Id, WallpaperSource.Image),
-                _ => $"{monitor.Name}: image source selected.");
+            await RunActionAsync(monitor, async token =>
+            {
+                actions.SetSource(monitor.Id, WallpaperSource.Image);
+                return await actions.EnsureThumbnailAsync(monitor.Id, token);
+            }, _ => $"{monitor.Name}: image source selected.");
         }
     }
 
-    private void FolderSource_Click(object sender, RoutedEventArgs e)
+    private async void FolderSource_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            RunAction(monitor, () => actions.SetSource(monitor.Id, WallpaperSource.Folder),
-                _ => $"{monitor.Name}: folder source selected.");
+            await RunActionAsync(monitor, async token =>
+            {
+                actions.SetSource(monitor.Id, WallpaperSource.Folder);
+                return await actions.EnsureThumbnailAsync(monitor.Id, token);
+            }, _ => $"{monitor.Name}: folder source selected.");
         }
     }
 
-    private void ChooseFolder_Click(object sender, RoutedEventArgs e)
+    private async void ChooseFolder_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            ChooseFolder(monitor);
+            await ChooseFolderAsync(monitor);
         }
     }
 
-    private void ChooseFolder(MonitorCardViewModel monitor)
+    private async Task ChooseFolderAsync(MonitorCardViewModel monitor)
     {
         var dialog = new OpenFolderDialog
         {
@@ -165,12 +260,12 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             var order = monitor.IsRandomOrder ? WallpaperOrder.Random : WallpaperOrder.Sequential;
-            RunAction(monitor, () => actions.SelectFolder(monitor.Id, dialog.FolderName, order),
+            await RunActionAsync(monitor, token => actions.SelectFolderAsync(monitor.Id, dialog.FolderName, order, token),
                 profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.");
         }
     }
 
-    private void Preview_Click(object sender, RoutedEventArgs e)
+    private async void Preview_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not MonitorCardViewModel monitor)
         {
@@ -179,55 +274,70 @@ public partial class MainWindow : Window
 
         if (monitor.Source == WallpaperSource.Folder)
         {
-            ChooseFolder(monitor);
+            await ChooseFolderAsync(monitor);
             return;
         }
 
-        ChooseImage(monitor);
+        await ChooseImageAsync(monitor);
     }
 
-    private void NextFolderImage_Click(object sender, RoutedEventArgs e)
+    private async void NextFolderImage_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            RunAction(monitor, () => actions.Next(monitor.Id),
+            await RunActionAsync(monitor, token => actions.NextAsync(monitor.Id, token),
                 profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.");
         }
     }
 
-    private void SequentialOrder_Click(object sender, RoutedEventArgs e)
+    private async void SequentialOrder_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            RunAction(monitor, () => actions.SetOrder(monitor.Id, WallpaperOrder.Sequential),
+            await RunActionAsync(monitor,
+                _ => Task.FromResult(actions.SetOrder(monitor.Id, WallpaperOrder.Sequential)),
                 _ => $"{monitor.Name}: sequential order selected.");
         }
     }
 
-    private void RandomOrder_Click(object sender, RoutedEventArgs e)
+    private async void RandomOrder_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
-            RunAction(monitor, () => actions.SetOrder(monitor.Id, WallpaperOrder.Random),
+            await RunActionAsync(monitor,
+                _ => Task.FromResult(actions.SetOrder(monitor.Id, WallpaperOrder.Random)),
                 _ => $"{monitor.Name}: random order selected.");
         }
     }
 
-    private void RunAction(MonitorCardViewModel monitor, Func<DisplayProfile> action, Func<DisplayProfile, string> successMessage)
+    private async Task RunActionAsync(
+        MonitorCardViewModel monitor,
+        Func<CancellationToken, Task<DisplayProfile>> action,
+        Func<DisplayProfile, string> successMessage)
     {
+        monitor.IsThumbnailLoading = true;
+        monitor.Thumbnail = null;
         try
         {
-            var profile = action();
+            var profile = await action(thumbnailLoads.Token);
             monitor.ApplyProfile(profile);
+            monitor.Thumbnail = await thumbnails.LoadAsync(actions.GetThumbnailPath(profile), thumbnailLoads.Token);
             ShowStatus(successMessage(profile), success: true);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception exception)
         {
             ShowStatus(exception.Message, error: true);
         }
+        finally
+        {
+            monitor.IsThumbnailLoading = false;
+        }
     }
 
-    private void Refresh_Click(object sender, RoutedEventArgs e) => LoadMonitors();
+    private async void Refresh_Click(object sender, RoutedEventArgs e) => await LoadMonitorsAsync(refresh: true);
 
     private void Settings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
 

@@ -27,12 +27,14 @@ public sealed record DisplayProfile
     public string? FolderPath { get; init; }
     public WallpaperOrder Order { get; init; }
     public string? CurrentFolderImagePath { get; init; }
+    public string? ThumbnailSourcePath { get; init; }
     public DateTimeOffset? LastAppliedUtc { get; init; }
 }
 
-public sealed class WallpprSettings
+public sealed record WallpprSettings
 {
     public int Version { get; init; } = 1;
     public AppBehaviorSettings Behavior { get; init; } = new();
     public Dictionary<string, DisplayProfile> Displays { get; init; } = [];
+    public List<MonitorWallpaper> CachedDisplays { get; init; } = [];
 }

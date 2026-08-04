@@ -30,9 +30,11 @@ public partial class App : System.Windows.Application
         }
 
         var settingsRepository = new SettingsRepository(settingsStore, settings);
+        var thumbnails = new WallpaperThumbnailCache();
         behaviorActions = new AppBehaviorActions(settingsRepository, new WindowsStartupRegistration());
-        var wallpaperActions = new WallpaperActions(wallpaperPlatform, settingsRepository);
-        mainWindow = new MainWindow(wallpaperPlatform, wallpaperActions, behaviorActions, warning);
+        var wallpaperActions = new WallpaperActions(wallpaperPlatform, settingsRepository, thumbnails);
+        var displayDiscovery = new DisplayDiscovery(wallpaperPlatform, settingsRepository);
+        mainWindow = new MainWindow(displayDiscovery, wallpaperActions, behaviorActions, thumbnails, warning);
         mainWindow.SettingsRequested += ShowSettings;
         MainWindow = mainWindow;
 

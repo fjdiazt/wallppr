@@ -5,6 +5,7 @@ namespace Wallppr;
 public sealed class WallpaperActions(
     IWallpaperPlatform platform,
     SettingsRepository settings,
+    WallpaperThumbnailCache thumbnails,
     Random? random = null,
     Func<DateTimeOffset>? utcNow = null)
 {
@@ -21,35 +22,33 @@ public sealed class WallpaperActions(
             ? profile
             : new DisplayProfile { DisplayId = displayId };
 
-    public DisplayProfile SelectImage(string displayId, string imagePath)
+    public Task<DisplayProfile> SelectImageAsync(string displayId, string imagePath, CancellationToken cancellationToken = default)
     {
         var fullPath = RequireImage(imagePath);
-        platform.SetWallpaper(displayId, fullPath);
-        return Persist(GetProfile(displayId) with
+        return ApplyAsync(GetProfile(displayId) with
         {
             Source = WallpaperSource.Image,
             ImagePath = fullPath,
             LastAppliedUtc = utcNow()
-        }, wallpaperChanged: true);
+        }, fullPath, cancellationToken);
     }
 
-    public DisplayProfile SelectFolder(string displayId, string folderPath, WallpaperOrder order)
+    public Task<DisplayProfile> SelectFolderAsync(string displayId, string folderPath, WallpaperOrder order, CancellationToken cancellationToken = default)
     {
         var fullPath = Path.GetFullPath(folderPath);
         var images = GetFolderImages(fullPath);
         var image = order == WallpaperOrder.Random ? images[random.Next(images.Length)] : images[0];
-        platform.SetWallpaper(displayId, image);
-        return Persist(GetProfile(displayId) with
+        return ApplyAsync(GetProfile(displayId) with
         {
             Source = WallpaperSource.Folder,
             FolderPath = fullPath,
             Order = order,
             CurrentFolderImagePath = image,
             LastAppliedUtc = utcNow()
-        }, wallpaperChanged: true);
+        }, image, cancellationToken);
     }
 
-    public DisplayProfile Next(string displayId)
+    public Task<DisplayProfile> NextAsync(string displayId, CancellationToken cancellationToken = default)
     {
         var profile = GetProfile(displayId);
         if (profile.Source != WallpaperSource.Folder || string.IsNullOrWhiteSpace(profile.FolderPath))
@@ -67,12 +66,11 @@ public sealed class WallpaperActions(
             _ => currentIndex < 0 ? 0 : (currentIndex + 1) % images.Length
         };
         var image = images[nextIndex];
-        platform.SetWallpaper(displayId, image);
-        return Persist(profile with
+        return ApplyAsync(profile with
         {
             CurrentFolderImagePath = image,
             LastAppliedUtc = utcNow()
-        }, wallpaperChanged: true);
+        }, image, cancellationToken);
     }
 
     public DisplayProfile SetOrder(string displayId, WallpaperOrder order) =>
@@ -81,13 +79,59 @@ public sealed class WallpaperActions(
     public DisplayProfile SetSource(string displayId, WallpaperSource source) =>
         Persist(GetProfile(displayId) with { Source = source }, wallpaperChanged: false);
 
+    public string? GetThumbnailPath(DisplayProfile profile)
+    {
+        var sourcePath = GetPreviewSource(profile);
+        return string.Equals(profile.ThumbnailSourcePath, sourcePath, StringComparison.OrdinalIgnoreCase)
+            ? thumbnails.GetExistingPath(profile.DisplayId)
+            : null;
+    }
+
+    public async Task<DisplayProfile> EnsureThumbnailAsync(string displayId, CancellationToken cancellationToken = default)
+    {
+        var profile = GetProfile(displayId);
+        var sourcePath = GetPreviewSource(profile);
+        if (string.IsNullOrWhiteSpace(sourcePath) || GetThumbnailPath(profile) is not null)
+        {
+            return profile;
+        }
+
+        if (await thumbnails.CreateAsync(displayId, sourcePath, cancellationToken) is null)
+        {
+            return profile;
+        }
+
+        var current = GetProfile(displayId);
+        return string.Equals(GetPreviewSource(current), sourcePath, StringComparison.OrdinalIgnoreCase)
+            ? Persist(current with { ThumbnailSourcePath = sourcePath }, wallpaperChanged: false)
+            : current;
+    }
+
+    private async Task<DisplayProfile> ApplyAsync(DisplayProfile profile, string imagePath, CancellationToken cancellationToken)
+    {
+        platform.SetWallpaper(profile.DisplayId, imagePath);
+        var pending = Persist(profile with { ThumbnailSourcePath = null }, wallpaperChanged: true);
+        if (await thumbnails.CreateAsync(profile.DisplayId, imagePath, cancellationToken) is null)
+        {
+            return pending;
+        }
+
+        var current = GetProfile(profile.DisplayId);
+        return string.Equals(GetPreviewSource(current), imagePath, StringComparison.OrdinalIgnoreCase)
+            ? Persist(current with { ThumbnailSourcePath = imagePath }, wallpaperChanged: false)
+            : current;
+    }
+
+    private static string? GetPreviewSource(DisplayProfile profile) =>
+        profile.Source == WallpaperSource.Folder
+            ? profile.CurrentFolderImagePath
+            : profile.ImagePath;
+
     private DisplayProfile Persist(DisplayProfile profile, bool wallpaperChanged)
     {
         var current = settings.Current;
-        var updated = new WallpprSettings
+        var updated = current with
         {
-            Version = current.Version,
-            Behavior = current.Behavior,
             Displays = new Dictionary<string, DisplayProfile>(current.Displays)
             {
                 [profile.DisplayId] = profile
