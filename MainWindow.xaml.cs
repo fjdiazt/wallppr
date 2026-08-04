@@ -83,7 +83,7 @@ public partial class MainWindow : Window
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
             monitor.IsFolderSource = true;
-            ShowStatus($"{monitor.Name}: folder UI selected. Slideshow behavior is not implemented yet.");
+            ShowStatus($"{monitor.Name}: folder source selected. Choose a folder to preview images.");
         }
     }
 
@@ -108,7 +108,16 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             monitor.SlideshowFolderPath = dialog.FolderName;
-            ShowStatus($"{monitor.Name}: folder selected. Slideshow behavior is not implemented yet.");
+            ShowStatus($"{monitor.Name}: previewing {monitor.FolderImageName}.");
+        }
+    }
+
+    private void NextFolderImage_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
+        {
+            monitor.MoveNextFolderImage();
+            ShowStatus($"{monitor.Name}: previewing {monitor.FolderImageName}.");
         }
     }
 
@@ -117,7 +126,7 @@ public partial class MainWindow : Window
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
             monitor.IsRandomOrder = false;
-            ShowStatus($"{monitor.Name}: sequential order selected. UI only.");
+            ShowStatus($"{monitor.Name}: sequential order selected.");
         }
     }
 
@@ -126,7 +135,7 @@ public partial class MainWindow : Window
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
             monitor.IsRandomOrder = true;
-            ShowStatus($"{monitor.Name}: random order selected. UI only.");
+            ShowStatus($"{monitor.Name}: random order selected.");
         }
     }
 

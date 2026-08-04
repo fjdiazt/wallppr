@@ -34,4 +34,62 @@ public sealed class MonitorCardViewModelTests
         Assert.AreEqual("wallpapers", viewModel.FolderName);
         Assert.AreEqual("next.png", viewModel.PendingWallpaperPath);
     }
+
+    [TestMethod]
+    public void Sequential_folder_preview_filters_sorts_and_wraps()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"wallppr-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+
+        try
+        {
+            File.WriteAllBytes(Path.Combine(folder, "b.png"), []);
+            File.WriteAllBytes(Path.Combine(folder, "a.jpg"), []);
+            File.WriteAllBytes(Path.Combine(folder, "ignored.txt"), []);
+            var viewModel = new MonitorCardViewModel(new MonitorWallpaper(0, "monitor-id", 0, 0, 1920, 1080, "current.jpg"))
+            {
+                SlideshowFolderPath = folder
+            };
+
+            Assert.AreEqual(Path.Combine(folder, "a.jpg"), viewModel.FolderPreviewPath);
+            Assert.IsTrue(viewModel.HasFolderImage);
+
+            viewModel.MoveNextFolderImage();
+            Assert.AreEqual(Path.Combine(folder, "b.png"), viewModel.FolderPreviewPath);
+
+            viewModel.MoveNextFolderImage();
+            Assert.AreEqual(Path.Combine(folder, "a.jpg"), viewModel.FolderPreviewPath);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void Random_folder_preview_avoids_immediate_repeat()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"wallppr-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+
+        try
+        {
+            File.WriteAllBytes(Path.Combine(folder, "a.jpg"), []);
+            File.WriteAllBytes(Path.Combine(folder, "b.png"), []);
+            var viewModel = new MonitorCardViewModel(new MonitorWallpaper(0, "monitor-id", 0, 0, 1920, 1080, "current.jpg"))
+            {
+                IsRandomOrder = true,
+                SlideshowFolderPath = folder
+            };
+            var first = viewModel.FolderPreviewPath;
+
+            viewModel.MoveNextFolderImage();
+
+            Assert.AreNotEqual(first, viewModel.FolderPreviewPath);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
 }
