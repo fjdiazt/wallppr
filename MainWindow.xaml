@@ -69,7 +69,8 @@
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="172" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="160" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
@@ -88,34 +89,74 @@
                                     </Border>
                                 </Grid>
 
-                                <Border Grid.Row="1" CornerRadius="12" Background="#090B10" BorderBrush="#30394D" BorderThickness="1" ClipToBounds="True">
+                                <Border Grid.Row="1" Margin="2,0,2,14" Padding="3" CornerRadius="11" Background="#0E121B" BorderBrush="#252D40" BorderThickness="1">
                                     <Grid>
-                                        <TextBlock Text="PREVIEW" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#465066" FontSize="11" FontWeight="Bold" />
-                                        <Image Source="{Binding PreviewPath}" Stretch="UniformToFill" AutomationProperties.Name="Wallpaper preview" />
-                                        <Border VerticalAlignment="Bottom" Height="54">
-                                            <Border.Background>
-                                                <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
-                                                    <GradientStop Color="#00000000" Offset="0" />
-                                                    <GradientStop Color="#C9000000" Offset="1" />
-                                                </LinearGradientBrush>
-                                            </Border.Background>
-                                        </Border>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ToggleButton Grid.Column="0" Style="{StaticResource SegmentToggleStyle}" IsChecked="{Binding IsImageSource, Mode=OneWay}" Click="ImageSource_Click" Content="Image" AutomationProperties.Name="Use image source" />
+                                        <ToggleButton Grid.Column="1" Style="{StaticResource SegmentToggleStyle}" IsChecked="{Binding IsFolderSource, Mode=OneWay}" Click="FolderSource_Click" Content="Folder" AutomationProperties.Name="Use folder source" />
                                     </Grid>
                                 </Border>
 
-                                <StackPanel Grid.Row="2" Margin="2,13,2,14">
-                                    <TextBlock Text="SELECTED IMAGE" Foreground="{StaticResource MutedTextBrush}" FontSize="10" FontWeight="Bold" />
-                                    <TextBlock Margin="0,5,0,0" Text="{Binding FileName}" ToolTip="{Binding PreviewPath}" TextTrimming="CharacterEllipsis" FontSize="13" />
-                                </StackPanel>
+                                <Border Grid.Row="2" CornerRadius="12" Background="#090B10" BorderBrush="#30394D" BorderThickness="1" ClipToBounds="True">
+                                    <Grid>
+                                        <Grid Visibility="{Binding IsImageSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="PREVIEW" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#465066" FontSize="11" FontWeight="Bold" />
+                                            <Image Source="{Binding PreviewPath}" Stretch="UniformToFill" AutomationProperties.Name="Wallpaper preview" />
+                                            <Border VerticalAlignment="Bottom" Height="54">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                                                        <GradientStop Color="#00000000" Offset="0" />
+                                                        <GradientStop Color="#C9000000" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                            </Border>
+                                        </Grid>
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsFolderSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="&#xE8B7;" HorizontalAlignment="Center" FontFamily="Segoe Fluent Icons" FontSize="36" Foreground="#A78BFA" />
+                                            <TextBlock Margin="0,10,0,0" Text="SLIDESHOW FOLDER" HorizontalAlignment="Center" Foreground="#66728A" FontSize="10" FontWeight="Bold" />
+                                            <TextBlock Margin="16,5" Text="{Binding FolderName}" HorizontalAlignment="Center" TextAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="14" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
 
-                                <Grid Grid.Row="3">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="10" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Style="{StaticResource BaseButtonStyle}" Click="Choose_Click" Content="Choose image" AutomationProperties.Name="Choose wallpaper image" />
-                                    <Button Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Click="Apply_Click" Content="Apply" IsEnabled="{Binding HasPendingWallpaper}" AutomationProperties.Name="Apply wallpaper" />
+                                <Grid Grid.Row="3" Margin="2,13,2,14">
+                                    <StackPanel Visibility="{Binding IsImageSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="SELECTED IMAGE" Foreground="{StaticResource MutedTextBrush}" FontSize="10" FontWeight="Bold" />
+                                        <TextBlock Margin="0,5,0,0" Text="{Binding FileName}" ToolTip="{Binding PreviewPath}" TextTrimming="CharacterEllipsis" FontSize="13" />
+                                    </StackPanel>
+                                    <StackPanel Visibility="{Binding IsFolderSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="SELECTED FOLDER" Foreground="{StaticResource MutedTextBrush}" FontSize="10" FontWeight="Bold" />
+                                        <TextBlock Margin="0,5,0,0" Text="{Binding SlideshowFolderPath, TargetNullValue=Choose a folder}" ToolTip="{Binding SlideshowFolderPath}" TextTrimming="CharacterEllipsis" FontSize="13" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Grid.Row="4">
+                                    <Grid Visibility="{Binding IsImageSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Style="{StaticResource BaseButtonStyle}" Click="Choose_Click" Content="Choose image" AutomationProperties.Name="Choose wallpaper image" />
+                                        <Button Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Click="Apply_Click" Content="Apply" IsEnabled="{Binding HasPendingWallpaper}" AutomationProperties.Name="Apply wallpaper" />
+                                    </Grid>
+                                    <StackPanel Visibility="{Binding IsFolderSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <Button Style="{StaticResource BaseButtonStyle}" Click="ChooseFolder_Click" Content="Choose folder" AutomationProperties.Name="Choose slideshow folder" />
+                                        <TextBlock Margin="2,14,0,7" Text="ORDER" Foreground="{StaticResource MutedTextBrush}" FontSize="10" FontWeight="Bold" />
+                                        <Border Padding="3" CornerRadius="11" Background="#0E121B" BorderBrush="#252D40" BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <ToggleButton Grid.Column="0" Style="{StaticResource SegmentToggleStyle}" IsChecked="{Binding IsSequentialOrder, Mode=OneWay}" Click="SequentialOrder_Click" Content="Sequential" AutomationProperties.Name="Sequential slideshow order" />
+                                                <ToggleButton Grid.Column="1" Style="{StaticResource SegmentToggleStyle}" IsChecked="{Binding IsRandomOrder, Mode=OneWay}" Click="RandomOrder_Click" Content="Random" AutomationProperties.Name="Random slideshow order" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
                                 </Grid>
                             </Grid>
                         </Border>

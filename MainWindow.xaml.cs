@@ -69,6 +69,67 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ImageSource_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
+        {
+            monitor.IsFolderSource = false;
+            ShowStatus($"{monitor.Name}: image source selected.");
+        }
+    }
+
+    private void FolderSource_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
+        {
+            monitor.IsFolderSource = true;
+            ShowStatus($"{monitor.Name}: folder UI selected. Slideshow behavior is not implemented yet.");
+        }
+    }
+
+    private void ChooseFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not MonitorCardViewModel monitor)
+        {
+            return;
+        }
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = $"Slideshow folder for {monitor.Name}",
+            Multiselect = false
+        };
+
+        if (Directory.Exists(monitor.SlideshowFolderPath))
+        {
+            dialog.InitialDirectory = monitor.SlideshowFolderPath;
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            monitor.SlideshowFolderPath = dialog.FolderName;
+            ShowStatus($"{monitor.Name}: folder selected. Slideshow behavior is not implemented yet.");
+        }
+    }
+
+    private void SequentialOrder_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
+        {
+            monitor.IsRandomOrder = false;
+            ShowStatus($"{monitor.Name}: sequential order selected. UI only.");
+        }
+    }
+
+    private void RandomOrder_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
+        {
+            monitor.IsRandomOrder = true;
+            ShowStatus($"{monitor.Name}: random order selected. UI only.");
+        }
+    }
+
     private void Apply_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not MonitorCardViewModel monitor ||

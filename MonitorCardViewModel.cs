@@ -8,6 +8,9 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
 {
     private string currentWallpaperPath = monitor.WallpaperPath;
     private string? pendingWallpaperPath;
+    private string? slideshowFolderPath;
+    private bool isFolderSource;
+    private bool isRandomOrder;
 
     public MonitorWallpaper Monitor { get; } = monitor;
     public string Name => Monitor.Name;
@@ -42,6 +45,59 @@ public sealed class MonitorCardViewModel(MonitorWallpaper monitor) : INotifyProp
     public string PreviewPath => PendingWallpaperPath ?? CurrentWallpaperPath;
     public string FileName => string.IsNullOrWhiteSpace(PreviewPath) ? "No wallpaper set" : Path.GetFileName(PreviewPath);
     public bool HasPendingWallpaper => !string.IsNullOrWhiteSpace(PendingWallpaperPath);
+    public bool IsImageSource => !IsFolderSource;
+    public bool IsFolderSource
+    {
+        get => isFolderSource;
+        set
+        {
+            if (isFolderSource == value)
+            {
+                return;
+            }
+
+            isFolderSource = value;
+            Notify();
+            Notify(nameof(IsImageSource));
+        }
+    }
+
+    public string? SlideshowFolderPath
+    {
+        get => slideshowFolderPath;
+        set
+        {
+            if (slideshowFolderPath == value)
+            {
+                return;
+            }
+
+            slideshowFolderPath = value;
+            Notify();
+            Notify(nameof(FolderName));
+        }
+    }
+
+    public string FolderName => string.IsNullOrWhiteSpace(SlideshowFolderPath)
+        ? "No folder selected"
+        : new DirectoryInfo(SlideshowFolderPath).Name;
+
+    public bool IsRandomOrder
+    {
+        get => isRandomOrder;
+        set
+        {
+            if (isRandomOrder == value)
+            {
+                return;
+            }
+
+            isRandomOrder = value;
+            Notify();
+            Notify(nameof(IsSequentialOrder));
+        }
+    }
+    public bool IsSequentialOrder => !IsRandomOrder;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
