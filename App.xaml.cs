@@ -7,6 +7,7 @@ public partial class App : System.Windows.Application
     private SingleInstanceCoordinator? singleInstance;
     private DesktopWallpaperService? wallpaperPlatform;
     private AppBehaviorActions? behaviorActions;
+    private SlideshowTimer? slideshowTimer;
     private MainWindow? mainWindow;
     private SettingsWindow? settingsWindow;
     private TrayIconService? trayIcon;
@@ -42,8 +43,9 @@ public partial class App : System.Windows.Application
         var thumbnails = new WallpaperThumbnailCache();
         behaviorActions = new AppBehaviorActions(settingsRepository, new WindowsStartupRegistration());
         var wallpaperActions = new WallpaperActions(wallpaperPlatform, settingsRepository, thumbnails);
+        slideshowTimer = new SlideshowTimer(settingsRepository, wallpaperActions);
         var displayDiscovery = new DisplayDiscovery(wallpaperPlatform, settingsRepository);
-        mainWindow = new MainWindow(displayDiscovery, wallpaperActions, behaviorActions, thumbnails, warning);
+        mainWindow = new MainWindow(displayDiscovery, wallpaperActions, behaviorActions, slideshowTimer, thumbnails, warning);
         mainWindow.SettingsRequested += ShowSettings;
         MainWindow = mainWindow;
 
@@ -51,6 +53,7 @@ public partial class App : System.Windows.Application
         behaviorActions.Changed += ApplyTrayBehavior;
         ApplyTrayBehavior(behaviorActions.Current);
         mainWindow.Show();
+        slideshowTimer.Start();
         singleInstance.ActivationRequested += () =>
         {
             Dispatcher.BeginInvoke(mainWindow.Restore);
@@ -68,7 +71,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        settingsWindow = new SettingsWindow(behaviorActions!)
+        settingsWindow = new SettingsWindow(behaviorActions!, slideshowTimer!)
         {
             Owner = mainWindow?.IsVisible == true ? mainWindow : null,
             WindowStartupLocation = mainWindow?.IsVisible == true
@@ -102,6 +105,7 @@ public partial class App : System.Windows.Application
     {
         singleInstance?.Dispose();
         trayIcon?.Dispose();
+        slideshowTimer?.Dispose();
         wallpaperPlatform?.Dispose();
         base.OnExit(e);
     }

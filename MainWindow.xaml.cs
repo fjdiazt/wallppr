@@ -18,7 +18,9 @@ public partial class MainWindow : Window
     private readonly DisplayDiscovery displayDiscovery;
     private readonly WallpaperActions actions;
     private readonly AppBehaviorActions behaviorActions;
+    private readonly SlideshowTimer slideshowTimer;
     private readonly WallpaperThumbnailCache thumbnails;
+    private readonly DispatcherTimer countdownTimer = new();
     private CancellationTokenSource thumbnailLoads = new();
     private string? startupWarning;
     private bool exitAllowed;
@@ -32,21 +34,36 @@ public partial class MainWindow : Window
         DisplayDiscovery displayDiscovery,
         WallpaperActions actions,
         AppBehaviorActions behaviorActions,
+        SlideshowTimer slideshowTimer,
         WallpaperThumbnailCache thumbnails,
         string? startupWarning = null)
     {
         this.displayDiscovery = displayDiscovery;
         this.actions = actions;
         this.behaviorActions = behaviorActions;
+        this.slideshowTimer = slideshowTimer;
         this.thumbnails = thumbnails;
         this.startupWarning = startupWarning;
         InitializeComponent();
         DataContext = this;
+        countdownTimer.Interval = TimeSpan.FromSeconds(1);
+        countdownTimer.Tick += OnCountdownTick;
+        slideshowTimer.ScheduleChanged += OnScheduleChanged;
+        IsVisibleChanged += OnIsVisibleChanged;
+        slideshowTimer.Completed += OnSlideshowCompleted;
         ContentRendered += OnContentRendered;
         SourceInitialized += (_, _) => EnableDarkTitleBar();
         StateChanged += OnStateChanged;
         Closing += OnClosing;
-        Closed += (_, _) => thumbnailLoads.Cancel();
+        Closed += (_, _) =>
+        {
+            countdownTimer.Stop();
+            countdownTimer.Tick -= OnCountdownTick;
+            thumbnailLoads.Cancel();
+            slideshowTimer.Completed -= OnSlideshowCompleted;
+            slideshowTimer.ScheduleChanged -= OnScheduleChanged;
+            IsVisibleChanged -= OnIsVisibleChanged;
+        };
     }
 
     public void Restore()
@@ -71,7 +88,35 @@ public partial class MainWindow : Window
             Hide();
             WindowState = WindowState.Normal;
         }
+
+        UpdateCountdownActivity();
     }
+
+    private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) =>
+        UpdateCountdownActivity();
+
+    private void OnCountdownTick(object? sender, EventArgs e) =>
+        UpdateSlideshowStatus();
+
+    private void OnScheduleChanged() =>
+        UpdateSlideshowStatus();
+
+    private void UpdateCountdownActivity()
+    {
+        if (IsVisible && WindowState != WindowState.Minimized)
+        {
+            countdownTimer.Start();
+        }
+        else
+        {
+            countdownTimer.Stop();
+        }
+
+        UpdateSlideshowStatus();
+    }
+
+    private void UpdateSlideshowStatus() =>
+        SlideshowStatusText.Text = SlideshowStatus.Format(slideshowTimer.IsAdvancing, slideshowTimer.Remaining);
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -261,7 +306,7 @@ public partial class MainWindow : Window
         {
             var order = monitor.IsRandomOrder ? WallpaperOrder.Random : WallpaperOrder.Sequential;
             await RunActionAsync(monitor, token => actions.SelectFolderAsync(monitor.Id, dialog.FolderName, order, token),
-                profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.");
+                profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.", resetSlideshow: true);
         }
     }
 
@@ -286,7 +331,7 @@ public partial class MainWindow : Window
         if ((sender as FrameworkElement)?.DataContext is MonitorCardViewModel monitor)
         {
             await RunActionAsync(monitor, token => actions.NextAsync(monitor.Id, token),
-                profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.");
+                profile => $"{monitor.Name}: applied {Path.GetFileName(profile.CurrentFolderImagePath)}.", resetSlideshow: true);
         }
     }
 
@@ -313,13 +358,18 @@ public partial class MainWindow : Window
     private async Task RunActionAsync(
         MonitorCardViewModel monitor,
         Func<CancellationToken, Task<DisplayProfile>> action,
-        Func<DisplayProfile, string> successMessage)
+        Func<DisplayProfile, string> successMessage,
+        bool resetSlideshow = false)
     {
         monitor.IsThumbnailLoading = true;
         monitor.Thumbnail = null;
         try
         {
             var profile = await action(thumbnailLoads.Token);
+            if (resetSlideshow)
+            {
+                slideshowTimer.Reset();
+            }
             monitor.ApplyProfile(profile);
             monitor.Thumbnail = await thumbnails.LoadAsync(actions.GetThumbnailPath(profile), thumbnailLoads.Token);
             ShowStatus(successMessage(profile), success: true);
@@ -334,6 +384,45 @@ public partial class MainWindow : Window
         finally
         {
             monitor.IsThumbnailLoading = false;
+        }
+    }
+
+    private async void OnSlideshowCompleted(SlideshowRunResult result)
+    {
+        foreach (var profile in result.Changed)
+        {
+            var monitor = Monitors.FirstOrDefault(candidate => candidate.Id == profile.DisplayId);
+            if (monitor is null)
+            {
+                continue;
+            }
+
+            monitor.IsThumbnailLoading = true;
+            try
+            {
+                monitor.ApplyProfile(profile);
+                monitor.Thumbnail = await thumbnails.LoadAsync(actions.GetThumbnailPath(profile), thumbnailLoads.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            finally
+            {
+                if (!thumbnailLoads.IsCancellationRequested)
+                {
+                    monitor.IsThumbnailLoading = false;
+                }
+            }
+        }
+
+        if (result.Errors.Count > 0)
+        {
+            ShowStatus(string.Join(" ", result.Errors), error: true);
+        }
+        else if (result.Changed.Count > 0)
+        {
+            ShowStatus($"Changed {result.Changed.Count} folder wallpaper{(result.Changed.Count == 1 ? string.Empty : "s")}.", success: true);
         }
     }
 

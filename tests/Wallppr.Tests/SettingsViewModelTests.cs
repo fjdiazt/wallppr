@@ -13,10 +13,11 @@ public sealed class SettingsViewModelTests
             StartWithWindows = true,
             MinimizeToTray = true,
             CloseToTray = true
-        });
+        }, 45);
 
         Assert.IsTrue(viewModel.StartWithWindows);
         Assert.IsTrue(viewModel.MinimizeToTray);
         Assert.IsTrue(viewModel.CloseToTray);
+        Assert.AreEqual(45, viewModel.IntervalSeconds);
     }
 }

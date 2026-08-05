@@ -19,6 +19,11 @@ public sealed record AppBehaviorSettings
     public bool CloseToTray { get; init; }
 }
 
+public sealed record SlideshowSettings
+{
+    public int IntervalSeconds { get; init; }
+}
+
 public sealed record DisplayProfile
 {
     public required string DisplayId { get; init; }
@@ -35,6 +40,7 @@ public sealed record WallpprSettings
 {
     public int Version { get; init; } = 1;
     public AppBehaviorSettings Behavior { get; init; } = new();
+    public SlideshowSettings Slideshow { get; init; } = new();
     public Dictionary<string, DisplayProfile> Displays { get; init; } = [];
     public List<MonitorWallpaper> CachedDisplays { get; init; } = [];
 }

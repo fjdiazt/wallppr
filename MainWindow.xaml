@@ -212,7 +212,7 @@
         <Border Grid.Row="3" Padding="34,12" Background="#0D1018" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <TextBlock Text="Native Windows wallpaper API" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
-                <TextBlock HorizontalAlignment="Right" Text="Settings &amp; tray · No scheduler · POC" Foreground="#69758B" FontSize="11" />
+                <TextBlock x:Name="SlideshowStatusText" HorizontalAlignment="Right" Text="Slideshow off" Foreground="#69758B" FontSize="11" />
             </Grid>
         </Border>
     </Grid>
