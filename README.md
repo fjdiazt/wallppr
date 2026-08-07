@@ -4,13 +4,9 @@
 
 # wallppr
 
-Different wallpaper for each monitor on Windows 11.
-
-Wallppr lets every display use its own image or wallpaper folder. Changes happen immediately, and folder wallpapers can rotate automatically without disabling Windows virtual desktops.
+Windows 11 cannot reliably set a different wallpaper per monitor while virtual desktops are in use. Wallppr fills that gap without disabling virtual desktops.
 
 ![Wallppr main window with empty image and folder examples](wallppr-screenshot.png)
-
-*Screenshot uses empty demo selections. No third-party wallpaper artwork is included.*
 
 ## Features
 
